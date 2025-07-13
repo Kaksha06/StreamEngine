@@ -1,5 +1,5 @@
-const { captureOwnerStack } = require("react")
-
+// const { captureOwnerStack } = require("react")
+// import { captureOwnerStack } from 'react'
 class ApiError extends Error {
     constructor(
         statusCode,
