@@ -6,6 +6,21 @@ import { ApiResponse } from "../utils/ApiResponse.js"
 import { response } from "express"
 import { log } from "console"
 
+const generateAccessAndRefreshTokens = async (UserId) => {
+    try {
+        const user = await User.findById(UserId)
+        const accessToken = user.generateAccessToken()
+        const refreshToken = user.generateRefreshToken()
+
+        user.refreshToken = refreshToken
+        await user.save({ validateBeforeSave:false })
+
+        return {accessToken, refreshToken}
+    } catch (error) {
+        throw new ApiError(500, "Something went wrong while generating access and referesh tokens")
+    }
+}
+
 
 const registerUser = asyncHandler(async (req, res) => {
     // res.status(200).json({
@@ -30,7 +45,8 @@ const registerUser = asyncHandler(async (req, res) => {
 
     // if(fullName===""){
     //     throw new ApiError(400,"fullname is required")
-    // } instead of doing this we will put all details together 
+    // } 
+    //instead of doing this we will put all details together 
 
     if (
         [fullName, email, username, password].some((field) =>
@@ -47,7 +63,7 @@ const registerUser = asyncHandler(async (req, res) => {
         throw new ApiError(409, "User with email or username already exist")
     }
 
-    console.log("FILES RECEIVED:", req.files);
+    // console.log("FILES RECEIVED:", req.files);
     const avatarLocalPath = req.files?.avatar[0]?.path;
     const coverImageLocalPath = req.files?.coverImage[0]?.path;
 
@@ -85,4 +101,88 @@ const registerUser = asyncHandler(async (req, res) => {
     )
 })
 
-export { registerUser }
+
+const loginUser = asyncHandler(async (req, res) => {
+    //req body -> data
+    //username or email
+    //find the user
+    //check password
+    //access and refresh token
+    //send cookie 
+
+    const { email, username, password } = req.body
+
+    if (!(username || email)) {
+        throw new ApiError(400, "username or email is required")
+    }
+
+    const user = await User.findOne({
+        $or: [{ username }, { email }]
+    })
+
+    if (!user) {
+        throw new ApiError(404, "User does not exist")
+    }
+
+    const isPasswordValid = await user.isPasswordCorrect(password);
+
+    if (!isPasswordValid) {
+        throw new ApiError(401, "Invalid User Credentials")
+    }
+
+     const {accessToken, refreshToken } = await generateAccessAndRefreshTokens(user._id)
+     const loggedInUser = await User.findById(user._id).select("-password -refreshToken")
+    
+     //when we give options httpony and secure as true it means that cookies can be modified only by server
+     //otherwise by default cookies koi bhi modify kr skate hai
+     const options ={
+        httpOnly:true,
+        secure:true
+     }
+
+     return res
+     .status(200)
+     .cookie("accessToken",accessToken,options)
+     .cookie("refreshToken",refreshToken,options)
+     .json(
+        new ApiResponse(
+            200,
+            {
+                user:loggedInUser,accessToken,refreshToken
+            },
+            "User logged in Successfully"
+        )
+     )
+    
+})
+
+const logoutUser = asyncHandler(async(req,res)=>{
+    await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set:{
+                refreshToken:undefined
+            }
+        },
+        {
+            new:true
+        }
+    )
+
+    const options ={
+        httpOnly:true,
+        secure:true
+     }
+
+     return res
+     .status(200)
+     .clearCookie("accessToken",options)
+     .clearCookie("refreshToken",options)
+     .json(new ApiResponse(200,{},"User logged out"))
+})
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser
+}
