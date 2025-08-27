@@ -47,7 +47,6 @@ const deleteOnCloudinary = async (localPath) => {
         }
         return result;
     } catch (error) {
-        console.log("error occurs in cloudinary.js and the error is ",error)
         throw new ApiError(500,"cloudinary deletion is failed")
     }
 }
