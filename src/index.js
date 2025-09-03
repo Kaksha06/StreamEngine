@@ -13,7 +13,7 @@ connectDB()
 
 .then(()=>{
      // Correctly listen on the port provided by Render, with a fallback
-    const host = "0.0.0.0"; // Listen on all network interfaces
+    const host = "0.0.0.0";// Listen on all network interfaces
 
     app.on("error",(error)=>{
          console.log("ERR:",error);
